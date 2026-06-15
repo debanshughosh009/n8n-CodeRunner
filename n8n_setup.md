@@ -4,6 +4,6 @@ N8N_ENABLE_UNSAFE_CORE_NODES=true \
 NODES_EXCLUDE='[]' \
 N8N_RUNNERS_ENABLED=true \
 N8N_PROXY_HOPS=1 \
-GENERIC_TIMEZONE="Europe/Amsterdam" \
-TZ="Europe/Amsterdam" \
+GENERIC_TIMEZONE="Asia/Kolkata" \
+TZ="Asia/Kolkata" \
 n8n
