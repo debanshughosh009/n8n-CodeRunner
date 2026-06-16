@@ -22,38 +22,84 @@ sp.run(['git', 'checkout', 'main'], check=True)
 sp.run(['git', 'pull'], check=True)
 sp.run(['git', 'checkout', '-B', branch], check=True)
 
+# --- READ EXISTING CODEBASE CONTEXT ---
+# Loop through relevant codebase files to pass them directly to Gemini
+codebase_context = ""
+exclude_dirs = {'.git', '__pycache__', 'node_modules', 'venv', '.venv'}
+allowed_extensions = {'.py', '.js', '.json', '.html', '.css', '.md', '.txt'}
+
+for path in repo_dir.rglob('*'):
+    if path.is_file() and not any(part in path.parts for part in exclude_dirs):
+        if path.suffix in allowed_extensions:
+            try:
+                relative_path = path.relative_to(repo_dir)
+                codebase_context += f"\n--- FILE: {relative_path} ---\n"
+                codebase_context += path.read_text(encoding='utf-8')
+            except Exception:
+                pass # Skip binary or unreadable files
+
 # --- GEMINI API INTEGRATION ---
-# Initialize client (looks for GEMINI_API_KEY environment variable)
-client = genai.Client()
+key_path = Path('/mnt/win/Playground/Github Linux/n8n-CodeRunner/github_issue_gemini_api_key.md')
+
+try:
+    # Read the file and clean any newline whitespace or wrapper issues
+    gemini_key = key_path.read_text(encoding='utf-8').strip()
+    client = genai.Client(api_key=gemini_key)
+except FileNotFoundError:
+    print(f"Error: API key file not found at {key_path}")
+    sys.exit(1)
+except Exception as e:
+    print(f"Error reading API key file: {e}")
+    sys.exit(1)
 
 prompt = f"""
-You are an automated code fixer. Fix the following repository issue.
+You are an automated code fixer. Fix the following repository issue based on the provided codebase context.
+
 Issue #{num}: {title}
 Description: {body}
 
-Look at the repository files and provide the necessary fixes. 
-You must respond ONLY with a JSON array of objects representing the file changes, using this exact schema:
-[
-  {{
-    "filepath": "relative/path/to/file.py",
-    "content": "The entire new content of the file..."
-  }}
-]
-Do not include markdown code blocks (like ```json) in your response, just raw JSON.
+--- CURRENT CODEBASE CONTEXT ---
+{codebase_context}
+--------------------------------
+
+Analyze the issue and modify or create the necessary files. 
+You must output a structured list containing the relative filepaths and their complete rewritten contents.
 """
 
-# Call the API using gemini-2.5-flash
+# Enforce strict JSON output matching your exact target layout
+json_schema = types.Schema(
+    type=types.Type.ARRAY,
+    items=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "filepath": types.Schema(type=types.Type.STRING, description="The relative path to the file inside the repo."),
+            "content": types.Schema(type=types.Type.STRING, description="The absolute new/modified full content for this file.")
+        },
+        required=["filepath", "content"]
+    )
+)
+
+# Setup generative structured configuration values
+config = types.GenerateContentConfig(
+    response_mime_type="application/json",
+    response_schema=json_schema,
+    temperature=0.1
+)
+
 response = client.models.generate_content(
     model='gemini-2.5-flash',
     contents=prompt,
+    config=config
 )
 
-# Parse Gemini's response and overwrite the local files
+# Parse Gemini's guaranteed clean JSON response
 try:
-    # Clean up any potential markdown formatting if the model slipped up
-    raw_json = response.text.strip().removeprefix('```json').removesuffix('```').strip()
-    file_changes = json.loads(raw_json)
+    file_changes = json.loads(response.text)
     
+    if not file_changes:
+        print("Gemini analyzed the repository and found no changes required.")
+        sys.exit(0)
+        
     for change in file_changes:
         target_file = repo_dir / change['filepath']
         target_file.parent.mkdir(parents=True, exist_ok=True)
