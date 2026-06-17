@@ -72,8 +72,8 @@ All three scripts follow the same lifecycle: clone-or-pull → branch (`{engine}
 ### 1. Self-host n8n (cloud n8n can't run shell commands)
 
 ```bash
-WEBHOOK_URL="https://<your-ngrok-subdomain>.ngrok-free.app" \
-N8N_EDITOR_BASE_URL="https://<your-ngrok-subdomain>.ngrok-free.app" \
+WEBHOOK_URL="<your-ngrok-subdomain>" \
+N8N_EDITOR_BASE_URL="<your-ngrok-subdomain>" \
 N8N_ENABLE_UNSAFE_CORE_NODES=true \
 NODES_EXCLUDE='[]' \
 N8N_RUNNERS_ENABLED=true \
