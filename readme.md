@@ -69,7 +69,7 @@ All three scripts follow the same lifecycle: clone-or-pull → branch (`{engine}
 
 ## Setup
 
-### 1. Self-host n8n (cloud n8n can't run shell commands)
+### 1. Self-host n8n 
 
 ```bash
 WEBHOOK_URL="<your-ngrok-subdomain>" \
